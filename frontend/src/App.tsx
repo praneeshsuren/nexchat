@@ -1,79 +1,15 @@
-import { useAuthContext } from '@asgardeo/auth-react';
+import React from 'react';
 import { motion } from 'framer-motion';
+import { useAuthContext } from '@asgardeo/auth-react'; 
 
-// --- Placeholder Components ---
-// These are simple placeholders for your real components.
-const Header = () => (
-  <header className="flex h-16 w-full items-center justify-between bg-white px-6 shadow-md z-10">
-    <div className="text-xl font-bold text-blue-600">NexChat</div>
-    <div className="flex items-center gap-4">
-      <span className="text-sm text-gray-700">Welcome!</span>
-      <div className="h-10 w-10 rounded-full bg-indigo-500"></div>
-    </div>
-  </header>
-);
-
-const Sidebar = () => (
-  <nav className="hidden h-full w-64 flex-col border-r border-gray-200 bg-gray-50 p-4 md:flex">
-    <div className="mb-4 rounded-lg bg-blue-100 p-3 text-sm font-semibold text-blue-700">
-      # General
-    </div>
-    <div className="rounded-lg p-3 text-sm font-semibold text-gray-600 hover:bg-gray-200">
-      # Team
-    </div>
-    <div className="rounded-lg p-3 text-sm font-semibold text-gray-600 hover:bg-gray-200">
-      # Projects
-    </div>
-    <div className="mt-auto rounded-lg p-3 text-sm font-semibold text-red-600 hover:bg-red-100">
-      Logout
-    </div>
-  </nav>
-);
-
-const ChatWindow = () => (
-  <div className="flex h-full flex-col">
-    {/* Chat Header */}
-    <div className="border-b border-gray-200 p-4">
-      <h2 className="text-xl font-semibold text-gray-800"># General</h2>
-      <p className="text-sm text-gray-500">3 members online</p>
-    </div>
-    
-    {/* Messages */}
-    <div className="flex-1 space-y-4 overflow-y-auto p-4">
-      <div className="flex items-start gap-3">
-        <div className="h-10 w-10 flex-shrink-0 rounded-full bg-green-500"></div>
-        <div>
-          <div className="font-bold text-gray-800">Alice</div>
-          <div className="mt-1 rounded-lg rounded-tl-none bg-gray-100 p-3 text-gray-700">
-            Hey everyone! Just checking in.
-          </div>
-        </div>
-      </div>
-      <div className="flex items-start gap-3">
-        <div className="h-10 w-10 flex-shrink-0 rounded-full bg-purple-500"></div>
-        <div>
-          <div className="font-bold text-gray-800">Bob</div>
-          <div className="mt-1 rounded-lg rounded-tl-none bg-gray-100 p-3 text-gray-700">
-            Hi Alice! Working on the new feature.
-          </div>
-        </div>
-      </div>
-    </div>
-    
-    {/* Input Box */}
-    <div className="border-t border-gray-200 p-4">
-      <input
-        type="text"
-        placeholder="Type a message..."
-        className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-      />
-    </div>
-  </div>
-);
+// --- Component Imports ---
+import Header from './components/Header';
+import Sidebar from './components/Sidebar';
+import ChatWindow from './components/ChatWindow';
 
 // --- Your Enhanced App Component ---
 function App() {
-  // This hook will work with your real Asgardeo provider
+  // This hook will now work with your real Asgardeo provider
   const { state, signIn } = useAuthContext();
 
   if (!state.isAuthenticated) {
@@ -82,7 +18,7 @@ function App() {
       <div className="flex min-h-screen w-full flex-col font-inter lg:flex-row">
         {/* Hero Section (Left Pane) */}
         <motion.div
-          className="relative flex w-full flex-col items-center justify-center p-8 lg:w-1/2"
+          className="relative flex h-screen/2 lg:h-screen w-full flex-col items-center justify-center p-8 lg:w-1/2"
           initial={{ opacity: 0, x: -50 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.7 }}
@@ -90,17 +26,18 @@ function App() {
           {/* Background Image */}
           <div className="absolute inset-0 z-0">
             <img
-              src="https://placehold.co/1000x1200/434190/FFFFFF?text=NexChat&font=raleway"
+              src="https://images.unsplash.com/photo-1522071820081-009f0129c71c?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%D&auto=format&fit=crop&w=1740&q=80"
               alt="Team collaboration"
               className="h-full w-full object-cover"
               // Handle image loading error
               onError={(e) => {
+                // Fix: Cast event target to HTMLImageElement
                 const target = e.target as HTMLImageElement;
-                target.onerror = null;
+                target.onerror = null; // Prevent infinite loop
                 target.src = "https://placehold.co/1000x1200/434190/FFFFFF?text=Chat+App&font=raleway";
               }}
             />
-            {/* Gradient Overlay */}
+            {/* Gradient Overlay - Fixed Tailwind class */}
             <div className="absolute inset-0 bg-gradient-to-br from-blue-600/70 to-purple-800/90"></div>
           </div>
 
@@ -138,12 +75,12 @@ function App() {
 
         {/* Login Section (Right Pane) */}
         <motion.div
-          className="flex w-full flex-col items-center justify-center bg-white p-8 lg:w-1/2"
+          className="flex w-full flex-col items-center justify-center bg-white p-12 lg:h-screen lg:w-1/2"
           initial={{ opacity: 0, x: 50 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.7 }}
         >
-          <div className="w-full max-w-md">
+          <div className="w-full max-w-sm">
             <h2 className="text-4xl font-extrabold text-gray-800 mb-4 text-center">
               Welcome Back
             </h2>
@@ -157,7 +94,7 @@ function App() {
               className="w-full bg-blue-600 text-white py-4 rounded-xl shadow-lg hover:bg-blue-700 transition-all flex items-center justify-center gap-3 font-semibold text-lg"
               onClick={() => signIn()}
             >
-              {/* Asgardeo Logo/Icon (simplified) or a Login Icon */}
+              {/* Login Icon */}
               <svg
                 className="w-6 h-6"
                 fill="none"
@@ -192,11 +129,16 @@ function App() {
   // This is your existing screen for authenticated users
   return (
     <div className="flex flex-col h-screen bg-gray-100 font-inter">
+      {/* Header component is imported */}
       <Header />
       <div className="flex flex-1 overflow-hidden">
+        {/* Sidebar component is imported */}
         <Sidebar />
         <main className="flex-1 h-full overflow-y-auto">
-          <ChatWindow />
+          {/* ChatWindow component is imported */}
+          {/* We pass the username to ChatWindow so it can pass it to Message */}
+          {/* You might need to adjust how you get the username, e.g., state.displayName */}
+          <ChatWindow currentUserName={state.username || "User"} />
         </main>
       </div>
     </div>
@@ -205,5 +147,4 @@ function App() {
 
 
 export default App;
-
 
