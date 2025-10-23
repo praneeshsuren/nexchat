@@ -1,13 +1,5 @@
-import { createContext, useContext, useState } from 'react';
 import { useAuthContext } from '@asgardeo/auth-react';
-// Import framer-motion, as you included it
 import { motion } from 'framer-motion';
-
-// --- Mock Asgardeo Auth Context ---
-// This is just to make the example runnable and demonstrate the toggle.
-// You can remove this and keep your existing import.
-const AuthContext = createContext();
-const useAuthContext = () => useContext(AuthContext);
 
 // --- Placeholder Components ---
 // These are simple placeholders for your real components.
@@ -103,8 +95,9 @@ function App() {
               className="h-full w-full object-cover"
               // Handle image loading error
               onError={(e) => {
-                e.target.onerror = null; 
-                e.target.src="https://placehold.co/1000x1200/434190/FFFFFF?text=Chat+App&font=raleway";
+                const target = e.target as HTMLImageElement;
+                target.onerror = null;
+                target.src = "https://placehold.co/1000x1200/434190/FFFFFF?text=Chat+App&font=raleway";
               }}
             />
             {/* Gradient Overlay */}
@@ -210,26 +203,7 @@ function App() {
   );
 }
 
-// --- Root Export ---
-// This component wraps your App in the mock provider to make it runnable.
-// In your real app, you'd just render <App /> inside your main Asgardeo provider.
-export default function AppWrapper() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  const authContextValue = {
-    state: { isAuthenticated },
-    signIn: () => {
-      console.log("Simulating Asgardeo Sign In...");
-      setIsAuthenticated(true);
-    },
-    // Add other mock functions/state as needed by your app
-  };
-
-  return (
-    <AuthContext.Provider value={authContextValue}>
-      <App />
-    </AuthContext.Provider>
-  );
-}
+export default App;
 
 
