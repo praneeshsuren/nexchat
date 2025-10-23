@@ -9,6 +9,7 @@ export type MessageType = typeof MessageType[keyof typeof MessageType];
 
 export interface ChatMessage {
   sender: string;
-  content: string | null; // Content is null for JOIN/LEAVE
-  type: MessageType;
+  content: string;
+  recipient?: string; // For direct messaging
+  channel?: string;   // "general", "team", "projects" or undefined for direct
 }

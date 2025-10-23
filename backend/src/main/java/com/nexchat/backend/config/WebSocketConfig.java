@@ -4,20 +4,62 @@ import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
+import org.springframework.lang.Nullable;
+import org.springframework.web.socket.WebSocketHandler;
+import org.springframework.web.socket.server.HandshakeInterceptor;
+import org.springframework.http.server.ServerHttpRequest;
+import org.springframework.http.server.ServerHttpResponse;
+import org.springframework.lang.NonNull;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.beans.factory.annotation.Autowired;
+import java.util.Map;
 
 
 @Configuration
 @EnableWebSocketMessageBroker
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
-    // Configuration methods can be added here as needed
+    @Autowired
+    private JwtDecoder jwtDecoder;
+
     @Override
-    public void registerStompEndpoints(StompEndpointRegistry registry) {
-        registry.addEndpoint("/ws").withSockJS();
+    public void registerStompEndpoints(@NonNull StompEndpointRegistry registry) {
+        registry.addEndpoint("/ws-chat")
+            .setAllowedOriginPatterns("*")
+            .addInterceptors(new HandshakeInterceptor() {
+                @Override
+                public boolean beforeHandshake(@NonNull ServerHttpRequest request, @NonNull ServerHttpResponse response,
+                                              @NonNull WebSocketHandler wsHandler, @NonNull Map<String, Object> attributes) {
+                    // Only require Authorization for actual WebSocket handshake, not SockJS info/XHR
+                    String upgradeHeader = request.getHeaders().getFirst("Upgrade");
+                    if (upgradeHeader != null && upgradeHeader.equalsIgnoreCase("websocket")) {
+                        String authHeader = request.getHeaders().getFirst("Authorization");
+                        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+                            try {
+                                var jwt = jwtDecoder.decode(authHeader.substring(7));
+                                attributes.put("username", jwt.getClaimAsString("sub"));
+                                return true;
+                            } catch (Exception e) {
+                                return false;
+                            }
+                        }
+                        return false;
+                    }
+                    // Allow SockJS fallback requests (like /info) without auth
+                    return true;
+                }
+                @Override
+                public void afterHandshake(@NonNull ServerHttpRequest request, @NonNull ServerHttpResponse response,
+                                          @NonNull WebSocketHandler wsHandler, @Nullable Exception ex) {
+                    // No-op
+                }
+            })
+            .withSockJS();
     }
 
     @Override
-    public void configureMessageBroker(MessageBrokerRegistry registry) {
-        registry.setApplicationDestinationPrefixes("/app");
-        registry.enableSimpleBroker("/topic");
+    public void configureMessageBroker(@NonNull MessageBrokerRegistry registry) {
+    registry.setApplicationDestinationPrefixes("/app");
+    registry.enableSimpleBroker("/queue", "/channel"); // Add /channel for group messaging
+    registry.setUserDestinationPrefix("/user");
     }
 }

@@ -1,59 +1,80 @@
-import React, { createContext, useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import type { IMessage } from '@stomp/stompjs';
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import type { ChatMessage } from '../types/chat';
-import { MessageType } from '../types/chat';
 import { useAuthContext } from '@asgardeo/auth-react';
 
-// Define the shape of the context
-interface ChatContextType {
+export type ActiveChannel = {
+  type: 'channel' | 'dm';
+  name: string;
+};
+
+export interface ChatContextType {
   messages: ChatMessage[];
   sendMessage: (messageContent: string) => void;
   isConnected: boolean;
+  activeChannel: ActiveChannel;
+  subscribeChannel: (name: string) => void;
+  subscribeDirect: (name: string) => void;
 }
 
 // Create the context
-const ChatContext = createContext<ChatContextType | undefined>(undefined);
+// Import context from separate file for Fast Refresh compliance
+import { ChatContext } from './ChatContextInstance';
 
 // Define the backend WebSocket endpoint
-// ** IMPORTANT: Change this URL to match your Spring Boot server's URL **
-const SOCKET_URL = 'http://localhost:8081/ws';
+const SOCKET_URL = 'http://localhost:8081/ws-chat';
 
 export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isConnected, setIsConnected] = useState(false);
+  const [activeChannel, setActiveChannel] = useState<ActiveChannel>({ type: 'channel', name: 'general' });
   const stompClientRef = useRef<Client | null>(null);
-  const { state } = useAuthContext(); // Get user info from Asgardeo
-
+  const { state, getAccessToken } = useAuthContext();
   const username = state?.username || 'Guest';
 
   useEffect(() => {
-    if (!username) return;
+    if (!username || username === 'Guest') return;
 
-    // Initialize the STOMP client
-    const client = new Client({
+    // Store client in a ref to access in cleanup
+    stompClientRef.current = new Client({
       webSocketFactory: () => new SockJS(SOCKET_URL),
       reconnectDelay: 5000,
       heartbeatIncoming: 4000,
       heartbeatOutgoing: 4000,
+      connectHeaders: {}, // Will be set async before activation
       onConnect: () => {
         setIsConnected(true);
         console.log('WebSocket Connected');
 
-        // Subscribe to the public topic
-        client.subscribe('/topic/public', (message: IMessage) => {
+        // Subscribe to public presence topic
+        stompClientRef.current!.subscribe('/topic/public', (message: IMessage) => {
           const chatMessage: ChatMessage = JSON.parse(message.body);
           setMessages((prevMessages) => [...prevMessages, chatMessage]);
         });
 
-        // Send the "JOIN" message
-        client.publish({
+        // Subscribe to specific channels
+        ['general', 'team', 'projects'].forEach((channel) => {
+          stompClientRef.current!.subscribe(`/channel/${channel}`, (message: IMessage) => {
+            const chatMessage: ChatMessage = JSON.parse(message.body);
+            setMessages((prevMessages) => [...prevMessages, chatMessage]);
+          });
+        });
+
+        // Subscribe to direct messages for this user
+        stompClientRef.current!.subscribe(`/user/queue/messages`, (message: IMessage) => {
+          const chatMessage: ChatMessage = JSON.parse(message.body);
+          setMessages((prevMessages) => [...prevMessages, chatMessage]);
+        });
+        
+        // Send JOIN message after all subscriptions are set up
+        stompClientRef.current!.publish({
           destination: '/app/chat.addUser',
           body: JSON.stringify({
             sender: username,
-            type: MessageType.JOIN,
-          } as ChatMessage),
+            content: '',
+          }),
         });
       },
       onDisconnect: () => {
@@ -65,48 +86,81 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       },
     });
 
-    stompClientRef.current = client;
-    client.activate(); // Connect
+    // Need to get token *before* activating
+    const connectAsync = async () => {
+      try {
+        const token = await getAccessToken();
+        if (stompClientRef.current) {
+          stompClientRef.current.connectHeaders['Authorization'] = `Bearer ${token}`;
+          stompClientRef.current.activate(); // Now connect
+        }
+      } catch (error) {
+        console.error("Failed to get Asgardeo token for WebSocket", error);
+      }
+    };
+
+    connectAsync();
 
     // Cleanup on unmount
     return () => {
-      // Send "LEAVE" message on disconnect
-      if (client.connected) {
-        client.publish({
-          destination: '/app/chat.addUser', // Using addUser to notify, as backend implies
+      if (stompClientRef.current && stompClientRef.current.connected) {
+        // Send LEAVE message
+        stompClientRef.current.publish({
+          destination: '/app/chat.addUser',
           body: JSON.stringify({
             sender: username,
-            type: MessageType.LEAVE,
-          } as ChatMessage),
+            content: '',
+          }),
         });
-        client.deactivate();
+        stompClientRef.current.deactivate();
       }
     };
-  }, [username]); // Re-run if username changes
+  }, [username, getAccessToken]); // Re-run if username or getAccessToken function changes
 
-  // Function to send a CHAT message
+  // Function to send a message to the *active* channel or user
   const sendMessage = (messageContent: string) => {
-    if (stompClientRef.current && stompClientRef.current.connected) {
+    if (stompClientRef.current && stompClientRef.current.connected && username !== 'Guest') {
+      
+      const msg: ChatMessage = {
+        sender: username,
+        content: messageContent,
+        // Set channel or recipient based on active chat
+        channel: activeChannel.type === 'channel' ? activeChannel.name : undefined,
+        recipient: activeChannel.type === 'dm' ? activeChannel.name : undefined,
+      };
+
       stompClientRef.current.publish({
         destination: '/app/chat.sendMessage',
-        body: JSON.stringify({
-          sender: username,
-          content: messageContent,
-          type: MessageType.CHAT,
-        } as ChatMessage),
+        body: JSON.stringify(msg),
       });
     } else {
-      console.error('Cannot send message: STOMP client is not connected.');
+      console.error('Cannot send message: STOMP client is not connected or user is not set.');
     }
   };
 
+  // Implement the channel switching functions
+  const subscribeChannel = useCallback((name: string) => {
+    setActiveChannel({ type: 'channel', name });
+  }, []);
+
+  const subscribeDirect = useCallback((name: string) => {
+    setActiveChannel({ type: 'dm', name });
+  }, []);
+
   return (
-    <ChatContext.Provider value={{ messages, sendMessage, isConnected }}>
+    <ChatContext.Provider 
+      value={{ 
+        messages, 
+        sendMessage, 
+        isConnected, 
+        activeChannel, 
+        subscribeChannel, 
+        subscribeDirect 
+      }}
+    >
       {children}
     </ChatContext.Provider>
   );
 };
 
-// Removed the useChat hook entirely to comply with Fast Refresh requirements
 
-export { ChatContext };

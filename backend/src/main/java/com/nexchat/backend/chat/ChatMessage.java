@@ -10,5 +10,6 @@ import lombok.*;
 public class ChatMessage {
     private String content;
     private String sender;
-    private MessageType type;
+    private String recipient; // For direct messaging
+    private String channel;   // "general", "team", "projects" or null for direct
 }
