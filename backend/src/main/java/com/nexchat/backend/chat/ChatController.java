@@ -7,13 +7,22 @@ import org.springframework.messaging.handler.annotation.SendTo;
 import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.*;
+import java.util.List;
 
 @Controller
+@RestController
 public class ChatController {
 
     // SimpMessagingTemplate allows us to send messages to specific users or topics
     @Autowired
     private SimpMessagingTemplate messagingTemplate;
+
+    @Autowired
+    private AsgardeoUserService asgardeoUserService;
+
+    @Autowired
+    private ChatMessageService chatMessageService;
 
     /**
      * Handles CHAT messages.
@@ -21,24 +30,37 @@ public class ChatController {
      */
     @MessageMapping("/chat.sendMessage")
     public void sendMessage(@Payload ChatMessage chatMessage) {
+        // Save to database
+        chatMessageService.saveMessage(chatMessage);
         if (chatMessage.getRecipient() != null && !chatMessage.getRecipient().isEmpty()) {
             // This is a direct message
-            // Send to the specific user's private queue
             messagingTemplate.convertAndSendToUser(
-                chatMessage.getRecipient(),          // User to send to
-                "/queue/messages",                 // Destination
-                chatMessage                        // Payload
+                chatMessage.getRecipient(),
+                "/queue/messages",
+                chatMessage
             );
         } else if (chatMessage.getChannel() != null && !chatMessage.getChannel().isEmpty()) {
             // This is a channel message
-            // Send to the specific channel topic
             messagingTemplate.convertAndSend(
-                "/channel/" + chatMessage.getChannel(), // Destination
-                chatMessage                             // Payload
+                "/channel/" + chatMessage.getChannel(),
+                chatMessage
             );
         }
-        // You could add an 'else' here to handle messages with no recipient or channel,
-        // maybe send them to /topic/public
+    }
+    /**
+     * REST endpoint to get all messages for a channel
+     */
+    @GetMapping("/api/channels/{channel}/messages")
+    public List<ChatMessageEntity> getChannelMessages(@PathVariable String channel) {
+        return chatMessageService.getMessagesForChannel(channel);
+    }
+
+    /**
+     * REST endpoint to get all direct messages between two users
+     */
+    @GetMapping("/api/direct/{user1}/{user2}/messages")
+    public List<ChatMessageEntity> getDirectMessages(@PathVariable String user1, @PathVariable String user2) {
+        return chatMessageService.getMessagesForDirect(user1, user2);
     }
 
     /**
@@ -49,15 +71,25 @@ public class ChatController {
     @SendTo("/topic/public")
     public ChatMessage addUser(@Payload ChatMessage chatMessage, SimpMessageHeaderAccessor headerAccessor) {
         // Get username from the WebSocket session (put there by the HandshakeInterceptor)
-        String username = (String) headerAccessor.getSessionAttributes().get("username");
-        
-        if (username != null) {
-            // Set the sender from the authenticated session attribute
-            chatMessage.setSender(username);
+        var sessionAttributes = headerAccessor.getSessionAttributes();
+        if (sessionAttributes != null) {
+            String username = (String) sessionAttributes.get("username");
+            if (username != null) {
+                // Set the sender from the authenticated session attribute
+                chatMessage.setSender(username);
+                // User creation can be handled via Asgardeo if needed
+            }
+            // Add username to the WebSocket session
+            sessionAttributes.put("username", chatMessage.getSender());
         }
-        
-        // Add username to the WebSocket session
-        headerAccessor.getSessionAttributes().put("username", chatMessage.getSender());
         return chatMessage;
+    }
+
+    /**
+     * REST endpoint to get all registered users from Asgardeo
+     */
+    @GetMapping("/api/users")
+    public List<String> getRegisteredUsers() {
+        return asgardeoUserService.listUsers();
     }
 }

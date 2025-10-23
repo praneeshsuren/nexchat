@@ -11,7 +11,7 @@ createRoot(document.getElementById('root')!).render(
         signInRedirectURL: "http://localhost:5173/",
         signOutRedirectURL: "http://localhost:5173/",
         baseUrl: "https://api.asgardeo.io/t/praneesh",
-        clientID: "2kNU1dmiB_kgdZGENh6EQ02gTwga",
+        clientID: "LBkYPqD3Ly2p7SDUW4QMLlezoWQa",
         scope: ["openid", "profile"],
       }}
     >
