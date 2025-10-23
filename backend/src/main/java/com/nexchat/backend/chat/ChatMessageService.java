@@ -4,9 +4,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 public class ChatMessageService {
+    private static final Logger logger = LoggerFactory.getLogger(ChatMessageService.class);
     @Autowired
     private ChatMessageRepository chatMessageRepository;
 
@@ -18,7 +21,12 @@ public class ChatMessageService {
                 .channel(chatMessage.getChannel())
                 .timestamp(Instant.now())
                 .build();
-        return chatMessageRepository.save(entity);
+            try {
+                return chatMessageRepository.save(entity);
+            } catch (Exception e) {
+                logger.error("Failed to save chat message", e);
+                return null;
+            }
     }
 
     public List<ChatMessageEntity> getMessagesForChannel(String channel) {
