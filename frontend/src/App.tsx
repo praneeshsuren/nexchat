@@ -1,19 +1,17 @@
 import React from 'react';
+import { useAuthContext } from '@asgardeo/auth-react';
 import { motion } from 'framer-motion';
-import { useAuthContext } from '@asgardeo/auth-react'; 
-
-// --- Component Imports ---
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import ChatWindow from './components/ChatWindow';
+import { ChatProvider } from './context/ChatContext'; // Import the provider
 
 // --- Your Enhanced App Component ---
 function App() {
-  // This hook will now work with your real Asgardeo provider
   const { state, signIn } = useAuthContext();
 
   if (!state.isAuthenticated) {
-    // New, attractive login page with Hero Section
+    // Login page (unchanged)
     return (
       <div className="flex min-h-screen w-full flex-col font-inter lg:flex-row">
         {/* Hero Section (Left Pane) */}
@@ -26,29 +24,21 @@ function App() {
           {/* Background Image */}
           <div className="absolute inset-0 z-0">
             <img
-              src="https://images.unsplash.com/photo-1522071820081-009f0129c71c?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%D&auto=format&fit=crop&w=1740&q=80"
+              src="https://images.unsplash.com/photo-1522071820081-009f0129c71c?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%D%D&auto=format&fit=crop&w=1740&q=80"
               alt="Team collaboration"
               className="h-full w-full object-cover"
-              // Handle image loading error
               onError={(e) => {
-                // Fix: Cast event target to HTMLImageElement
                 const target = e.target as HTMLImageElement;
-                target.onerror = null; // Prevent infinite loop
-                target.src = "https://placehold.co/1000x1200/434190/FFFFFF?text=Chat+App&font=raleway";
+                target.onerror = null;
+                target.src = 'https://placehold.co/1000x1200/434190/FFFFFF?text=Chat+App&font=raleway';
               }}
             />
-            {/* Gradient Overlay - Fixed Tailwind class */}
+            {/* Gradient Overlay */}
             <div className="absolute inset-0 bg-gradient-to-br from-blue-600/70 to-purple-800/90"></div>
           </div>
-
-          {/* Animated floating chat bubbles from your example */}
-          <div className="absolute top-10 left-5 w-3 h-3 bg-white rounded-full animate-bounce-slow opacity-30 z-10"></div>
-          <div className="absolute bottom-20 right-10 w-4 h-4 bg-white rounded-full animate-bounce-slow opacity-20 z-10"></div>
-          <div className="absolute top-1/2 left-1/3 w-5 h-5 bg-white rounded-full animate-bounce-slow opacity-25 z-10"></div>
           
           {/* Hero Content */}
           <div className="relative z-20 flex flex-col items-center text-center text-white lg:items-start lg:text-left">
-            {/* Chat Icon */}
             <svg
               className="mb-6 h-20 w-20"
               fill="none"
@@ -94,7 +84,6 @@ function App() {
               className="w-full bg-blue-600 text-white py-4 rounded-xl shadow-lg hover:bg-blue-700 transition-all flex items-center justify-center gap-3 font-semibold text-lg"
               onClick={() => signIn()}
             >
-              {/* Login Icon */}
               <svg
                 className="w-6 h-6"
                 fill="none"
@@ -126,25 +115,22 @@ function App() {
     );
   }
 
-  // This is your existing screen for authenticated users
+  // Authenticated App View
+  // Wrap the chat UI in the ChatProvider
   return (
-    <div className="flex flex-col h-screen bg-gray-100 font-inter">
-      {/* Header component is imported */}
-      <Header />
-      <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar component is imported */}
-        <Sidebar />
-        <main className="flex-1 h-full overflow-y-auto">
-          {/* ChatWindow component is imported */}
-          {/* We pass the username to ChatWindow so it can pass it to Message */}
-          {/* You might need to adjust how you get the username, e.g., state.displayName */}
-          <ChatWindow currentUserName={state.username || "User"} />
-        </main>
+    <ChatProvider>
+      <div className="flex flex-col h-screen bg-gray-100 font-inter">
+        <Header />
+        <div className="flex flex-1 overflow-hidden">
+          <Sidebar />
+          <main className="flex-1 h-full overflow-y-auto">
+            {/* ChatWindow no longer needs props passed down */}
+            <ChatWindow />
+          </main>
+        </div>
       </div>
-    </div>
+    </ChatProvider>
   );
 }
 
-
 export default App;
-

@@ -1,30 +1,21 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send } from 'lucide-react';
-import Message from './Message'; // Import the Message component
+import Message from './Message';
+import { useChat } from '../hooks/useChat'; // Import the custom hook from the correct location
+import { useAuthContext } from '@asgardeo/auth-react';
 
-// Define the shape of a message object
-interface MessageType {
-  id: string;
-  sender: string;
-  text: string;
-}
-
-// Mock initial messages
-const initialMessages: MessageType[] = [
-  { id: 'm1', sender: 'Alice Smith', text: 'Hey everyone, starting the project kickoff!' },
-  { id: 'm2', sender: 'Bob Johnson', text: 'Sounds great! I just pushed the initial component library.' },
-  { id: 'm3', sender: 'system', text: 'Charlie Brown joined the channel.' },
-];
-
-/**
- * Main chat window with message display and input.
- */
-const ChatWindow: React.FC<{ currentUserName: string }> = ({ currentUserName }) => {
-  const [messages, setMessages] = useState<MessageType[]>(initialMessages);
+const ChatWindow: React.FC = () => {
   const [newMessage, setNewMessage] = useState('');
-  const messagesEndRef = useRef<null | HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  
+  // Get messages and send function from the context
+  const { messages, sendMessage, isConnected } = useChat();
+  
+  // Get current user's name from auth context
+  const { state } = useAuthContext();
+  const currentUserName = state?.username || 'User';
 
-  // Scroll to bottom whenever messages change
+  // Scroll to the bottom of the chat on new messages
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -36,60 +27,62 @@ const ChatWindow: React.FC<{ currentUserName: string }> = ({ currentUserName }) 
   // Handle sending a new message
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault();
-    if (newMessage.trim() === '') return;
+    if (newMessage.trim() === '' || !isConnected) return;
 
-    const messageToSend: MessageType = {
-      id: `m${messages.length + 1}`,
-      sender: currentUserName, // Use the prop for the sender's name
-      text: newMessage.trim(),
-    };
-
-    setMessages([...messages, messageToSend]);
+    sendMessage(newMessage); // Use the function from context
     setNewMessage('');
   };
 
   return (
-    <div className="flex h-full flex-1 flex-col">
+    <div className="flex h-full flex-col bg-gray-100">
       {/* Chat Header */}
-      <header className="border-b bg-white p-4 shadow-sm">
-        <h2 className="text-xl font-bold text-gray-800">#general</h2>
-        <p className="text-sm text-gray-500">The main channel for all team discussions.</p>
-      </header>
+      <div className="sticky top-0 z-10 border-b border-gray-200 bg-white p-4">
+        <h2 className="text-xl font-semibold text-gray-800"># General</h2>
+        <p className="text-sm text-gray-500">
+          {isConnected ? (
+            <span className="text-green-600">Connected</span>
+          ) : (
+            <span className="text-red-600">Connecting...</span>
+          )}
+        </p>
+      </div>
 
       {/* Message List */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.map((msg) => (
+      <div className="flex-1 space-y-4 overflow-y-auto p-4">
+  {messages.map((msg: import('../types/chat').ChatMessage, index: number) => (
           <Message
-            key={msg.id}
-            sender={msg.sender}
-            text={msg.text}
-            // Check if the message sender is the current logged-in user
-            isCurrentUser={msg.sender === currentUserName}
+            key={index} // Using index as key, consider unique IDs from backend
+            message={msg}
+            currentUserName={currentUserName}
           />
         ))}
-        {/* Empty div to scroll to */}
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Message Input */}
-      <footer className="border-t bg-white p-4">
+      {/* Input Box */}
+      <div className="sticky bottom-0 border-t border-gray-200 bg-white p-4">
         <form onSubmit={handleSend} className="flex items-center gap-3">
           <input
             type="text"
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
-            placeholder="Type your message..."
-            className="flex-1 rounded-lg border bg-gray-100 px-4 py-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder={
+              isConnected
+                ? 'Type a message in # General...'
+                : 'Waiting to connect...'
+            }
+            className="w-full rounded-lg border border-gray-300 px-4 py-3 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            disabled={!isConnected}
           />
           <button
             type="submit"
-            className="rounded-lg bg-blue-600 p-3 text-white transition-all hover:bg-blue-700 disabled:bg-gray-400"
-            disabled={newMessage.trim() === ''}
+            className="shrink-0 rounded-lg bg-blue-600 p-3 text-white transition-all hover:bg-blue-700 disabled:opacity-50"
+            disabled={newMessage.trim() === '' || !isConnected}
           >
             <Send className="h-5 w-5" />
           </button>
         </form>
-      </footer>
+      </div>
     </div>
   );
 };
