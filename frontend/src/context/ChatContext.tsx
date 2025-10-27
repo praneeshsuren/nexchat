@@ -40,7 +40,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Store client in a ref to access in cleanup
     stompClientRef.current = new Client({
-      webSocketFactory: () => new SockJS(SOCKET_URL),
+      // Force SockJS to use XHR transports to avoid initial WebSocket handshake errors
+      webSocketFactory: () => new SockJS(SOCKET_URL, undefined, { transports: ['xhr-streaming', 'xhr-polling'] }),
       reconnectDelay: 5000,
       heartbeatIncoming: 4000,
       heartbeatOutgoing: 4000,
@@ -122,9 +123,9 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const loadHistory = async () => {
       try {
-        // Build headers conditionally: for public channel history, do NOT send Authorization
-        let headers: HeadersInit = {};
-        let token: string | undefined = undefined;
+        // Temporarily do not send Authorization for both channel and DM history while endpoints are permitAll
+        // This avoids 401s during setup. We can re-enable auth headers once tokens are validated end-to-end.
+  const headers: HeadersInit = {};
 
         let url = '';
         if (activeChannel.type === 'channel') {
@@ -134,9 +135,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // For DMs we need the current user's name
           if (!username || username === 'Guest') return;
           url = `${API_BASE}/api/direct/${encodeURIComponent(username)}/${encodeURIComponent(activeChannel.name)}/messages`;
-          // For DM endpoints, include Authorization header
-          token = await getAccessToken();
-          headers = { Authorization: `Bearer ${token}` };
+          // No Authorization header for now (endpoint is opened in SecurityConfig)
         }
 
         const res = await fetch(url, { headers });
