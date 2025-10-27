@@ -38,6 +38,7 @@ public class SecurityConfig {
                 .requestMatchers("/", "/static/**", "/webjars/**").permitAll()
                 // Allow unauthenticated reads for message history endpoints
                 .requestMatchers(HttpMethod.GET, "/api/channels/**", "/api/direct/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/users", "/api/asgardeo/**").permitAll()
                 .anyRequest().authenticated()
             )
             .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults())) // Use JWT for resource server

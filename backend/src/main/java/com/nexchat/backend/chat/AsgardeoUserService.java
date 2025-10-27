@@ -57,6 +57,7 @@ public class AsgardeoUserService {
                         logger.error("Failed to fetch Asgardeo access token: response body is null or missing access_token");
                         return null;
                     }
+
                     return body.get("access_token").toString();
                 } catch (Exception e) {
                     logger.error("Exception while fetching Asgardeo access token", e);
@@ -64,34 +65,74 @@ public class AsgardeoUserService {
                 }
         }
 
+        // Diagnostics helper: returns true if we can fetch an access token
+        public boolean canFetchToken() {
+            try {
+                String token = fetchAccessToken();
+                return token != null && !token.isBlank();
+            } catch (Exception e) {
+                logger.error("Diagnostics: token fetch failed", e);
+                return false;
+            }
+        }
+
         public List<String> listUsers() {
-                String accessToken = fetchAccessToken();
-                if (accessToken == null) {
-                    logger.error("No Asgardeo access token available, cannot list users");
-                    return List.of();
-                }
-                String url = asgardeoBaseUrl + "/internal_user_mgt_list";
-                HttpHeaders headers = new HttpHeaders();
-                headers.setBearerAuth(accessToken);
-                headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
-                HttpEntity<Void> entity = new HttpEntity<>(headers);
-                try {
-                    ResponseEntity<List<Map<String, Object>>> response = restTemplate.exchange(
+            String accessToken = fetchAccessToken();
+            if (accessToken == null) {
+                logger.error("No Asgardeo access token available, cannot list users");
+                return List.of();
+            }
+            HttpHeaders headers = new HttpHeaders();
+            headers.setBearerAuth(accessToken);
+            headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
+            HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+            int startIndex = 1;
+            int count = 100; // page size
+            int totalResults = Integer.MAX_VALUE;
+            List<String> all = new java.util.ArrayList<>();
+
+            try {
+                while (all.size() < totalResults) {
+                    String url = asgardeoBaseUrl + "/scim2/Users?startIndex=" + startIndex + "&count=" + count;
+                    ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
                         url,
                         HttpMethod.GET,
                         entity,
-                        new ParameterizedTypeReference<List<Map<String, Object>>>() {}
+                        new ParameterizedTypeReference<Map<String, Object>>() {}
                     );
-                    List<Map<String, Object>> users = response.getBody();
-                    if (users == null) {
-                        logger.error("User list response body is null");
-                        return List.of();
+                    Map<String, Object> body = response.getBody();
+                    if (body == null) {
+                        logger.error("User list response body is null at startIndex {}", startIndex);
+                        break;
                     }
-                    return users.stream().map(u -> u.get("username").toString()).toList();
-                } catch (Exception e) {
-                    logger.error("Exception while listing Asgardeo users", e);
-                    return List.of();
+                    Object total = body.get("totalResults");
+                    if (total instanceof Number n) {
+                        totalResults = n.intValue();
+                    }
+                    Object resourcesObj = body.get("Resources");
+                    if (!(resourcesObj instanceof List<?> resources)) {
+                        logger.error("SCIM Users response missing Resources array at startIndex {}", startIndex);
+                        break;
+                    }
+                    int addedThisPage = 0;
+                    for (Object item : resources) {
+                        if (item instanceof Map<?, ?> m) {
+                            Object userName = m.get("userName");
+                            if (userName != null) {
+                                all.add(userName.toString());
+                                addedThisPage++;
+                            }
+                        }
+                    }
+                    if (addedThisPage == 0) break; // no more pages
+                    startIndex += count;
                 }
+            } catch (Exception e) {
+                logger.error("Exception while listing Asgardeo users via SCIM", e);
+            }
+
+            return all;
         }
 
     // You can add create, view, delete, update methods similarly
