@@ -13,6 +13,7 @@ import org.springframework.web.filter.CorsFilter;
 import java.util.List;
 import org.springframework.security.config.Customizer;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpMethod;
 
 @Configuration // Make sure this annotation is present
 @EnableWebSecurity
@@ -34,7 +35,9 @@ public class SecurityConfig {
         http
             .authorizeHttpRequests(authz -> authz
                 // Any other paths that need to be public
-                .requestMatchers("/", "/static/**", "/webjars/**").permitAll() 
+                .requestMatchers("/", "/static/**", "/webjars/**").permitAll()
+                // Allow unauthenticated reads for message history endpoints
+                .requestMatchers(HttpMethod.GET, "/api/channels/**", "/api/direct/**").permitAll()
                 .anyRequest().authenticated()
             )
             .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults())) // Use JWT for resource server

@@ -9,10 +9,13 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Controller
 @RestController
 public class ChatController {
+    private static final Logger logger = LoggerFactory.getLogger(ChatController.class);
 
     // SimpMessagingTemplate allows us to send messages to specific users or topics
     @Autowired
@@ -52,7 +55,9 @@ public class ChatController {
      */
     @GetMapping("/api/channels/{channel}/messages")
     public List<ChatMessageEntity> getChannelMessages(@PathVariable String channel) {
-        return chatMessageService.getMessagesForChannel(channel);
+        List<ChatMessageEntity> list = chatMessageService.getMessagesForChannel(channel);
+        logger.info("GET /api/channels/{}/messages -> {} messages", channel, list.size());
+        return list;
     }
 
     /**
@@ -60,7 +65,9 @@ public class ChatController {
      */
     @GetMapping("/api/direct/{user1}/{user2}/messages")
     public List<ChatMessageEntity> getDirectMessages(@PathVariable String user1, @PathVariable String user2) {
-        return chatMessageService.getMessagesForDirect(user1, user2);
+        List<ChatMessageEntity> list = chatMessageService.getMessagesForDirect(user1, user2);
+        logger.info("GET /api/direct/{}/{}/messages -> {} messages", user1, user2, list.size());
+        return list;
     }
 
     /**

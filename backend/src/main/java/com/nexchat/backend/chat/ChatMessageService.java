@@ -30,7 +30,9 @@ public class ChatMessageService {
     }
 
     public List<ChatMessageEntity> getMessagesForChannel(String channel) {
-        return chatMessageRepository.findByChannel(channel);
+        List<ChatMessageEntity> list = chatMessageRepository.findByChannel(channel);
+        list.sort((a, b) -> a.getTimestamp().compareTo(b.getTimestamp()));
+        return list;
     }
 
     public List<ChatMessageEntity> getMessagesForDirect(String user1, String user2) {

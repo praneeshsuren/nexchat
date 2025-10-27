@@ -25,6 +25,7 @@ import { ChatContext } from './ChatContextInstance';
 
 // Define the backend WebSocket endpoint
 const SOCKET_URL = 'http://localhost:8081/ws-chat';
+const API_BASE = 'http://localhost:8081';
 
 export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -116,6 +117,46 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     };
   }, [username, getAccessToken]); // Re-run if username or getAccessToken function changes
+
+  // Load historical messages for the active channel/DM from the backend
+  useEffect(() => {
+    const loadHistory = async () => {
+      try {
+        // Build headers conditionally: for public channel history, do NOT send Authorization
+        let headers: HeadersInit = {};
+        let token: string | undefined = undefined;
+
+        let url = '';
+        if (activeChannel.type === 'channel') {
+          // Channel history does not depend on current username
+          url = `${API_BASE}/api/channels/${encodeURIComponent(activeChannel.name)}/messages`;
+        } else {
+          // For DMs we need the current user's name
+          if (!username || username === 'Guest') return;
+          url = `${API_BASE}/api/direct/${encodeURIComponent(username)}/${encodeURIComponent(activeChannel.name)}/messages`;
+          // For DM endpoints, include Authorization header
+          token = await getAccessToken();
+          headers = { Authorization: `Bearer ${token}` };
+        }
+
+        const res = await fetch(url, { headers });
+        if (!res.ok) {
+          console.error('Failed to load message history', res.status, await res.text());
+          return;
+        }
+        const data: Array<{ sender: string; content: string; recipient?: string; channel?: string }>= await res.json();
+        console.debug('Loaded history', {
+          target: activeChannel,
+          count: Array.isArray(data) ? data.length : 0,
+        });
+        // Replace current messages with fetched history for a clean view
+        setMessages(data);
+      } catch (err) {
+        console.error('Error loading message history', err);
+      }
+    };
+    loadHistory();
+  }, [activeChannel, username, getAccessToken]);
 
   // Function to send a message to the *active* channel or user
   const sendMessage = (messageContent: string) => {
