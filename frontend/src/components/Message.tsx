@@ -1,6 +1,7 @@
 import React from 'react';
 import type { ChatMessage } from '../types/chat';
 import { MessageType } from '../types/chat';
+import { useChat } from '../hooks/useChat';
 
 interface MessageProps {
   message: ChatMessage;
@@ -8,13 +9,15 @@ interface MessageProps {
 }
 
 const Message: React.FC<MessageProps> = ({ message, currentUserName }) => {
-  
+  const { displayNameFor } = useChat();
+  const senderLabel = displayNameFor(message.sender);
+
   // Handle JOIN or LEAVE messages
   if (message.type === MessageType.JOIN || message.type === MessageType.LEAVE) {
     return (
       <div className="my-2 text-center text-xs text-gray-500">
-        <span className="font-semibold">{message.sender}</span>
-  {message.type === MessageType.JOIN ? ' joined the chat' : ' left the chat'}
+        <span className="font-semibold">{senderLabel}</span>
+        {message.type === MessageType.JOIN ? ' joined the chat' : ' left the chat'}
       </div>
     );
   }
@@ -23,7 +26,7 @@ const Message: React.FC<MessageProps> = ({ message, currentUserName }) => {
   const isCurrentUser = message.sender === currentUserName;
 
   // Get first letter for avatar
-  const avatarLetter = message.sender ? message.sender.charAt(0).toUpperCase() : '?';
+  const avatarLetter = senderLabel ? senderLabel.charAt(0).toUpperCase() : '?';
 
   // Basic color hashing for avatars
   const getAvatarColor = (name: string) => {
@@ -57,9 +60,9 @@ const Message: React.FC<MessageProps> = ({ message, currentUserName }) => {
       {/* Avatar */}
       <div
   className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full font-bold text-white ${getAvatarColor(
-          message.sender
+          senderLabel
         )}`}
-        title={message.sender}
+  title={senderLabel}
       >
         {avatarLetter}
       </div>

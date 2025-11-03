@@ -19,6 +19,7 @@ export interface ChatContextType {
   activeChannel: ActiveChannel;
   subscribeChannel: (name: string) => void;
   subscribeDirect: (name: string, label?: string) => void;
+  displayNameFor: (username: string) => string;
 }
 
 // Create the context
@@ -36,6 +37,34 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const stompClientRef = useRef<Client | null>(null);
   const { state, getAccessToken } = useAuthContext();
   const username = state?.username || 'Guest';
+  // Map from normalized userName -> display label
+  const [userLabelMap, setUserLabelMap] = useState<Record<string, string>>({});
+  // Map from normalized userName -> original SCIM userName (may include prefixes)
+  const [originalUserNameMap, setOriginalUserNameMap] = useState<Record<string, string>>({});
+  // Track topics we've already subscribed to
+  const subscribedTopicsRef = useRef<Set<string>>(new Set());
+
+  // Helper to normalize usernames for matching
+  const normalizeUser = (u: string) => {
+    if (!u) return '';
+    const s = u.includes('/') ? u.substring(u.lastIndexOf('/') + 1) : u;
+    return s.trim();
+  };
+
+  // Resolve a friendly display name for any username
+  const displayNameFor = useCallback((u: string) => {
+    const key = normalizeUser(u);
+    const mapped = userLabelMap[key];
+    if (mapped) return mapped;
+    // Fallbacks: strip domain if email-like, else return sanitized
+    if (key.includes('@')) {
+      const local = key.split('@')[0];
+      // Title-case-ish fallback
+      const pretty = local.replace(/[_./-]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+      return pretty || 'User';
+    }
+    return key || 'User';
+  }, [userLabelMap]);
 
   useEffect(() => {
     if (!username || username === 'Guest') return;
@@ -52,22 +81,29 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsConnected(true);
         console.log('WebSocket Connected');
 
+        const subscribeIfNeeded = (topic: string, cb: (m: IMessage) => void) => {
+          if (!subscribedTopicsRef.current.has(topic)) {
+            subscribedTopicsRef.current.add(topic);
+            stompClientRef.current!.subscribe(topic, cb);
+          }
+        };
+
         // Subscribe to public presence topic
-        stompClientRef.current!.subscribe('/topic/public', (message: IMessage) => {
+        subscribeIfNeeded('/topic/public', (message: IMessage) => {
           const chatMessage: ChatMessage = JSON.parse(message.body);
           setMessages((prevMessages) => [...prevMessages, chatMessage]);
         });
 
         // Subscribe to specific channels
         ['general', 'team', 'projects'].forEach((channel) => {
-          stompClientRef.current!.subscribe(`/channel/${channel}`, (message: IMessage) => {
+          subscribeIfNeeded(`/channel/${channel}`, (message: IMessage) => {
             const chatMessage: ChatMessage = JSON.parse(message.body);
             setMessages((prevMessages) => [...prevMessages, chatMessage]);
           });
         });
 
         // Subscribe to direct messages for this user (per-user topic)
-        stompClientRef.current!.subscribe(`/dm/${username}`, (message: IMessage) => {
+        subscribeIfNeeded(`/dm/${username}`, (message: IMessage) => {
           const chatMessage: ChatMessage = JSON.parse(message.body);
           setMessages((prevMessages) => [...prevMessages, chatMessage]);
         });
@@ -122,6 +158,67 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     };
   }, [username, getAccessToken]); // Re-run if username or getAccessToken function changes
+
+  // Load users -> build label map (GivenName FamilyName or displayName) and original name map
+  useEffect(() => {
+    let isMounted = true;
+    type UserSummary = { userName: string; givenName?: string; familyName?: string; displayName?: string };
+    const fetchWithRetry = async (attempt = 1): Promise<UserSummary[] | null> => {
+      try {
+        const res = await fetch(`${API_BASE}/api/users`);
+        if (!res.ok) return null;
+        return (await res.json()) as UserSummary[];
+      } catch {
+        if (attempt < 5) {
+          await new Promise(r => setTimeout(r, attempt * 400));
+          return fetchWithRetry(attempt + 1);
+        }
+        return null;
+      }
+    };
+    const buildMap = async () => {
+      const list = await fetchWithRetry();
+      if (!isMounted || !list) return;
+      const map: Record<string, string> = {};
+      const originalMap: Record<string, string> = {};
+      for (const u of list) {
+        const key = normalizeUser(u.userName);
+        const sanitize = (s?: string) => {
+          if (!s) return '';
+          if (s.includes('@')) {
+            const local = s.split('@')[0];
+            return local.replace(/[_./-]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+          }
+          return s;
+        };
+        const label = `${u.givenName ?? ''} ${u.familyName ?? ''}`.trim() || sanitize(u.displayName) || sanitize(key);
+        map[key] = label;
+        originalMap[key] = u.userName;
+      }
+      setUserLabelMap(map);
+      setOriginalUserNameMap(originalMap);
+    };
+    buildMap();
+    return () => { isMounted = false; };
+  }, []);
+
+  // After maps are loaded and socket connected, subscribe to canonical SCIM username topic if different
+  useEffect(() => {
+    if (!isConnected || !stompClientRef.current) return;
+    const norm = normalizeUser(username);
+    const scimUserName = originalUserNameMap[norm];
+    if (scimUserName && scimUserName !== username) {
+      const topic = `/dm/${scimUserName}`;
+      if (!subscribedTopicsRef.current.has(topic)) {
+        subscribedTopicsRef.current.add(topic);
+        stompClientRef.current.subscribe(topic, (message: IMessage) => {
+          const chatMessage: ChatMessage = JSON.parse(message.body);
+          setMessages((prevMessages) => [...prevMessages, chatMessage]);
+        });
+        console.debug('Subscribed to additional DM topic for self:', topic);
+      }
+    }
+  }, [isConnected, username, originalUserNameMap]);
 
   // Load historical messages for the active channel/DM from the backend
   useEffect(() => {
@@ -217,7 +314,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isConnected, 
         activeChannel, 
         subscribeChannel, 
-        subscribeDirect 
+        subscribeDirect,
+        displayNameFor
       }}
     >
       {children}

@@ -91,8 +91,16 @@ const Sidebar: React.FC = () => {
         <h2 className="mt-6 mb-2 px-2 text-xs font-semibold uppercase text-gray-400">Users</h2>
         <div className="flex flex-col gap-1">
           {users.map((u) => {
+            const sanitize = (s?: string) => {
+              if (!s) return '';
+              if (s.includes('@')) {
+                const local = s.split('@')[0];
+                return local.replace(/[_./-]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+              }
+              return s;
+            };
             const nameLabel = `${u.givenName ?? ''} ${u.familyName ?? ''}`.trim();
-            const label = nameLabel || u.displayName || u.userName;
+            const label = nameLabel || sanitize(u.displayName) || sanitize(u.userName);
             const isActive = activeChannel.type === 'dm' && activeChannel.name === u.userName;
             const isCurrent = currentUserName && u.userName === currentUserName;
             return (
