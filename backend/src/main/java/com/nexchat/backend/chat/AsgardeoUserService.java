@@ -76,7 +76,7 @@ public class AsgardeoUserService {
             }
         }
 
-        public List<String> listUsers() {
+        public List<UserSummary> listUsers() {
             String accessToken = fetchAccessToken();
             if (accessToken == null) {
                 logger.error("No Asgardeo access token available, cannot list users");
@@ -90,7 +90,7 @@ public class AsgardeoUserService {
             int startIndex = 1;
             int count = 100; // page size
             int totalResults = Integer.MAX_VALUE;
-            List<String> all = new java.util.ArrayList<>();
+            List<UserSummary> all = new java.util.ArrayList<>();
 
             try {
                 while (all.size() < totalResults) {
@@ -118,9 +118,21 @@ public class AsgardeoUserService {
                     int addedThisPage = 0;
                     for (Object item : resources) {
                         if (item instanceof Map<?, ?> m) {
-                            Object userName = m.get("userName");
+                            String userName = m.get("userName") != null ? m.get("userName").toString() : null;
+                            String givenName = null;
+                            String familyName = null;
+                            String displayName = null;
+                            Object nameObj = m.get("name");
+                            if (nameObj instanceof Map<?,?> nm) {
+                                Object g = nm.get("givenName");
+                                Object f = nm.get("familyName");
+                                if (g != null) givenName = g.toString();
+                                if (f != null) familyName = f.toString();
+                            }
+                            Object displayObj = m.get("displayName");
+                            if (displayObj != null) displayName = displayObj.toString();
                             if (userName != null) {
-                                all.add(userName.toString());
+                                all.add(new UserSummary(userName, givenName, familyName, displayName));
                                 addedThisPage++;
                             }
                         }

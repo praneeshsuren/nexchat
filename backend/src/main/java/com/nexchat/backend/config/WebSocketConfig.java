@@ -59,7 +59,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     public void configureMessageBroker(@NonNull MessageBrokerRegistry registry) {
     registry.setApplicationDestinationPrefixes("/app");
-    registry.enableSimpleBroker("/queue", "/channel"); // Add /channel for group messaging
+    registry.enableSimpleBroker("/queue", "/channel", "/dm"); // include /dm for direct messaging without Principal
     registry.setUserDestinationPrefix("/user");
     }
 }

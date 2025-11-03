@@ -36,10 +36,9 @@ public class ChatController {
         // Save to database
         chatMessageService.saveMessage(chatMessage);
         if (chatMessage.getRecipient() != null && !chatMessage.getRecipient().isEmpty()) {
-            // This is a direct message
-            messagingTemplate.convertAndSendToUser(
-                chatMessage.getRecipient(),
-                "/queue/messages",
+            // Direct message: route to a per-user topic instead of relying on Principal
+            messagingTemplate.convertAndSend(
+                "/dm/" + chatMessage.getRecipient(),
                 chatMessage
             );
         } else if (chatMessage.getChannel() != null && !chatMessage.getChannel().isEmpty()) {
@@ -71,6 +70,18 @@ public class ChatController {
     }
 
     /**
+     * Safer REST endpoint to get all direct messages using query params to support usernames containing '/'
+     * Example: /api/direct/messages?user1=alice@example.com&user2=DEFAULT/bob@example.com
+     */
+    @GetMapping("/api/direct/messages")
+    public List<ChatMessageEntity> getDirectMessagesQuery(@RequestParam("user1") String user1,
+                                                          @RequestParam("user2") String user2) {
+        List<ChatMessageEntity> list = chatMessageService.getMessagesForDirect(user1, user2);
+        logger.info("GET /api/direct/messages?user1={}&user2={} -> {} messages", user1, user2, list.size());
+        return list;
+    }
+
+    /**
      * Handles JOIN and LEAVE messages.
      * Broadcasts the message to the public topic for presence notifications.
      */
@@ -96,7 +107,7 @@ public class ChatController {
      * REST endpoint to get all registered users from Asgardeo
      */
     @GetMapping("/api/users")
-    public List<String> getRegisteredUsers() {
+    public List<UserSummary> getRegisteredUsers() {
         return asgardeoUserService.listUsers();
     }
 }

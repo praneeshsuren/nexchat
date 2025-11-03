@@ -38,6 +38,9 @@ public class SecurityConfig {
                 .requestMatchers("/", "/static/**", "/webjars/**").permitAll()
                 // Temporarily permit unauthenticated reads for message history while diagnosing token 401s
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/channels/**", "/api/direct/**").permitAll()
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/direct/messages").permitAll()
+                // Also allow users listing while wiring UI (will re-secure later)
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/users").permitAll()
                 .anyRequest().authenticated()
             )
             .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults())) // Use JWT for resource server

@@ -65,8 +65,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
           });
         });
 
-        // Subscribe to direct messages for this user
-        stompClientRef.current!.subscribe(`/user/queue/messages`, (message: IMessage) => {
+        // Subscribe to direct messages for this user (per-user topic)
+        stompClientRef.current!.subscribe(`/dm/${username}`, (message: IMessage) => {
           const chatMessage: ChatMessage = JSON.parse(message.body);
           setMessages((prevMessages) => [...prevMessages, chatMessage]);
         });
@@ -126,6 +126,19 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const loadHistory = async () => {
       try {
+        const fetchWithRetry = async (url: string, headers: HeadersInit, attempt = 1): Promise<Response | null> => {
+          try {
+            const res = await fetch(url, { headers });
+            if (!res.ok) return res;
+            return res;
+          } catch (e) {
+            if (attempt < 5) {
+              await new Promise(r => setTimeout(r, attempt * 500));
+              return fetchWithRetry(url, headers, attempt + 1);
+            }
+            throw e;
+          }
+        };
         // Do NOT send Authorization for history endpoints while we diagnose 401s;
         // backend temporarily permits these GET routes.
         const headers: HeadersInit = {};
@@ -137,12 +150,17 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } else {
           // For DMs we need the current user's name
           if (!username || username === 'Guest') return;
-          url = `${API_BASE}/api/direct/${encodeURIComponent(username)}/${encodeURIComponent(activeChannel.name)}/messages`;
+          // Use query-parameter endpoint to safely support slashes in usernames
+          const u1 = encodeURIComponent(username);
+          const u2 = encodeURIComponent(activeChannel.name);
+          url = `${API_BASE}/api/direct/messages?user1=${u1}&user2=${u2}`;
         }
 
-        const res = await fetch(url, { headers });
-        if (!res.ok) {
-          console.error('Failed to load message history', res.status, await res.text());
+        const res = await fetchWithRetry(url, headers);
+        if (!res || !res.ok) {
+          const status = res ? res.status : 'no-response';
+          const body = res ? await res.text() : '';
+          console.error('Failed to load message history', status, body);
           return;
         }
         const data: Array<{ sender: string; content: string; recipient?: string; channel?: string }>= await res.json();
