@@ -1,4 +1,4 @@
-import React from 'react';
+// React import not needed with React 17+ JSX transform and Vite
 import { useAuthContext } from '@asgardeo/auth-react';
 import { motion } from 'framer-motion';
 import Header from './components/Header';

@@ -8,6 +8,7 @@ export type MessageType = typeof MessageType[keyof typeof MessageType];
 
 
 export interface ChatMessage {
+  type?: MessageType; // 'CHAT' | 'JOIN' | 'LEAVE' (optional for history rows)
   sender: string;
   content: string;
   recipient?: string; // For direct messaging

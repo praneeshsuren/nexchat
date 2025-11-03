@@ -14,7 +14,7 @@ const Message: React.FC<MessageProps> = ({ message, currentUserName }) => {
     return (
       <div className="my-2 text-center text-xs text-gray-500">
         <span className="font-semibold">{message.sender}</span>
-        {message.type === MessageType.JOIN ? ' joined the chat' : ' left the chat'}
+  {message.type === MessageType.JOIN ? ' joined the chat' : ' left the chat'}
       </div>
     );
   }

@@ -3,6 +3,7 @@ import type { IMessage } from '@stomp/stompjs';
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import type { ChatMessage } from '../types/chat';
+import { MessageType } from '../types/chat';
 import { useAuthContext } from '@asgardeo/auth-react';
 
 export type ActiveChannel = {
@@ -74,6 +75,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         stompClientRef.current!.publish({
           destination: '/app/chat.addUser',
           body: JSON.stringify({
+            type: MessageType.JOIN,
             sender: username,
             content: '',
           }),
@@ -110,6 +112,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         stompClientRef.current.publish({
           destination: '/app/chat.addUser',
           body: JSON.stringify({
+            type: MessageType.LEAVE,
             sender: username,
             content: '',
           }),
@@ -123,9 +126,9 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const loadHistory = async () => {
       try {
-        // Temporarily do not send Authorization for both channel and DM history while endpoints are permitAll
-        // This avoids 401s during setup. We can re-enable auth headers once tokens are validated end-to-end.
-  const headers: HeadersInit = {};
+        // Do NOT send Authorization for history endpoints while we diagnose 401s;
+        // backend temporarily permits these GET routes.
+        const headers: HeadersInit = {};
 
         let url = '';
         if (activeChannel.type === 'channel') {
@@ -135,7 +138,6 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // For DMs we need the current user's name
           if (!username || username === 'Guest') return;
           url = `${API_BASE}/api/direct/${encodeURIComponent(username)}/${encodeURIComponent(activeChannel.name)}/messages`;
-          // No Authorization header for now (endpoint is opened in SecurityConfig)
         }
 
         const res = await fetch(url, { headers });
@@ -162,6 +164,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (stompClientRef.current && stompClientRef.current.connected && username !== 'Guest') {
       
       const msg: ChatMessage = {
+        type: MessageType.CHAT,
         sender: username,
         content: messageContent,
         // Set channel or recipient based on active chat
