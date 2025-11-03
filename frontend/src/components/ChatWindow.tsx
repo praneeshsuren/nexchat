@@ -50,7 +50,7 @@ const ChatWindow: React.FC = () => {
   // Header label
   const headerLabel = activeChannel.type === 'channel'
     ? `# ${activeChannel.name.charAt(0).toUpperCase() + activeChannel.name.slice(1)}`
-    : `@ ${activeChannel.name}`;
+    : `@ ${activeChannel.label || activeChannel.name}`;
 
   return (
     <div className="flex h-full flex-col bg-gray-100">

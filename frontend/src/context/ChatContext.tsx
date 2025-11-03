@@ -8,7 +8,8 @@ import { useAuthContext } from '@asgardeo/auth-react';
 
 export type ActiveChannel = {
   type: 'channel' | 'dm';
-  name: string;
+  name: string; // id: channel name or userName for DM
+  label?: string; // human-friendly label for display (DM names)
 };
 
 export interface ChatContextType {
@@ -17,7 +18,7 @@ export interface ChatContextType {
   isConnected: boolean;
   activeChannel: ActiveChannel;
   subscribeChannel: (name: string) => void;
-  subscribeDirect: (name: string) => void;
+  subscribeDirect: (name: string, label?: string) => void;
 }
 
 // Create the context
@@ -204,8 +205,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setActiveChannel({ type: 'channel', name });
   }, []);
 
-  const subscribeDirect = useCallback((name: string) => {
-    setActiveChannel({ type: 'dm', name });
+  const subscribeDirect = useCallback((name: string, label?: string) => {
+    setActiveChannel({ type: 'dm', name, label });
   }, []);
 
   return (
