@@ -36,11 +36,26 @@ public class ChatController {
         // Save to database
         chatMessageService.saveMessage(chatMessage);
         if (chatMessage.getRecipient() != null && !chatMessage.getRecipient().isEmpty()) {
-            // Direct message: route to a per-user topic instead of relying on Principal
+            // Direct message: send to both recipient AND sender so both see the message
+            String recipient = chatMessage.getRecipient();
+            String sender = chatMessage.getSender();
+            
+            // Send to recipient's DM topic
             messagingTemplate.convertAndSend(
-                "/dm/" + chatMessage.getRecipient(),
+                "/dm/" + recipient,
                 chatMessage
             );
+            
+            // Also send to sender's DM topic so they see their own message
+            // (only if sender is different from recipient to avoid duplicate)
+            if (sender != null && !sender.isEmpty() && !sender.equals(recipient)) {
+                messagingTemplate.convertAndSend(
+                    "/dm/" + sender,
+                    chatMessage
+                );
+            }
+            
+            logger.info("DM sent from {} to {}", sender, recipient);
         } else if (chatMessage.getChannel() != null && !chatMessage.getChannel().isEmpty()) {
             // This is a channel message
             messagingTemplate.convertAndSend(

@@ -4,6 +4,13 @@ import Message from './Message';
 import { useChat } from '../hooks/useChat';
 import { useAuthContext } from '@asgardeo/auth-react';
 
+// Helper to normalize usernames for matching (strip prefixes like "DEFAULT/")
+const normalizeUser = (u: string | undefined) => {
+  if (!u) return '';
+  const s = u.includes('/') ? u.substring(u.lastIndexOf('/') + 1) : u;
+  return s.trim().toLowerCase();
+};
+
 const ChatWindow: React.FC = () => {
   const [newMessage, setNewMessage] = useState('');
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -38,10 +45,16 @@ const ChatWindow: React.FC = () => {
     if (activeChannel.type === 'channel') {
       return msg.channel === activeChannel.name;
     } else if (activeChannel.type === 'dm') {
+      // Normalize all usernames for comparison to handle prefixes like "DEFAULT/"
+      const msgSender = normalizeUser(msg.sender);
+      const msgRecipient = normalizeUser(msg.recipient);
+      const activeUser = normalizeUser(activeChannel.name);
+      const currentUser = normalizeUser(currentUserName);
+      
       // Show messages sent to or from the selected user
       return (
-        (msg.sender === activeChannel.name && msg.recipient === currentUserName) ||
-        (msg.sender === currentUserName && msg.recipient === activeChannel.name)
+        (msgSender === activeUser && msgRecipient === currentUser) ||
+        (msgSender === currentUser && msgRecipient === activeUser)
       );
     }
     return false;

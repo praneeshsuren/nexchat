@@ -13,6 +13,21 @@ public class ChatMessageService {
     @Autowired
     private ChatMessageRepository chatMessageRepository;
 
+    /**
+     * Normalize username by extracting the part after the last "/" if present
+     * e.g., "DEFAULT/user@example.com" -> "user@example.com"
+     */
+    private String normalizeUsername(String username) {
+        if (username == null || username.isEmpty()) {
+            return "";
+        }
+        int slashIndex = username.lastIndexOf('/');
+        if (slashIndex >= 0 && slashIndex < username.length() - 1) {
+            return username.substring(slashIndex + 1).toLowerCase().trim();
+        }
+        return username.toLowerCase().trim();
+    }
+
     public ChatMessageEntity saveMessage(ChatMessage chatMessage) {
         ChatMessageEntity entity = ChatMessageEntity.builder()
                 .sender(chatMessage.getSender())
@@ -36,10 +51,19 @@ public class ChatMessageService {
     }
 
     public List<ChatMessageEntity> getMessagesForDirect(String user1, String user2) {
-        List<ChatMessageEntity> sent = chatMessageRepository.findBySenderAndRecipient(user1, user2);
-        List<ChatMessageEntity> received = chatMessageRepository.findBySenderAndRecipient(user2, user1);
-        sent.addAll(received);
-        sent.sort((a, b) -> a.getTimestamp().compareTo(b.getTimestamp()));
-        return sent;
+        // Normalize usernames to handle format variations like "DEFAULT/user@example.com"
+        String normalizedUser1 = normalizeUsername(user1);
+        String normalizedUser2 = normalizeUsername(user2);
+        
+        logger.debug("Fetching DMs between '{}' (normalized: '{}') and '{}' (normalized: '{}')", 
+                     user1, normalizedUser1, user2, normalizedUser2);
+        
+        // Use the flexible query that handles username format variations
+        List<ChatMessageEntity> messages = chatMessageRepository.findDirectMessagesBetweenUsers(
+            normalizedUser1, normalizedUser2
+        );
+        
+        logger.debug("Found {} messages between users", messages.size());
+        return messages;
     }
 }
