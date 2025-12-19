@@ -88,7 +88,7 @@ const Sidebar: React.FC = () => {
             );
           })}
         </div>
-        <h2 className="mt-6 mb-2 px-2 text-xs font-semibold uppercase text-gray-400">Users</h2>
+        <h2 className="mt-6 mb-2 px-2 text-xs font-semibold uppercase text-gray-400">Friends</h2>
         <div className="flex flex-col gap-1">
           {users.map((u) => {
             const sanitize = (s?: string) => {
